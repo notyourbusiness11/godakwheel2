@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Raffle Wheel</title>
+<script>
+  // Runs before first paint so there's no flash of the wrong theme. Light is the default;
+  // a saved choice in localStorage is the only thing that switches it to dark.
+  (function () {
+    try {
+      if (localStorage.getItem("wheel_theme") === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    } catch (e) {}
+  })();
+</script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --border-solid: #ddd8cb;
+    --text: #1c1c1c;
+    --muted: #6b6b6b;
+    --gold: #ffd23f;
+    --gold-border: #c9a52d;
+    --gold-text: #8a6416;
+    --well: #efebe1;
+    --btn-secondary-bg: #e4e0d5;
+    --btn-secondary-bg-hover: #d8d3c5;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #14151a;
+    --panel: #1e2028;
+    --border-solid: #3a3d47;
+    --text: #f2f2f5;
+    --muted: #9a9ba5;
+    --gold-text: #ffd23f;
+    --well: #14151a;
+    --btn-secondary-bg: #2a2d38;
+    --btn-secondary-bg-hover: #34384a;
+  }
+  * { box-sizing: border-box; }
+  html { scrollbar-gutter: stable; }
+  html, body { overflow-x: hidden; max-width: 100%; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  h1#raffleTitle {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--gold-text);
+    text-align: center;
+    margin: 0;
+  }
+  .wheel-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    aspect-ratio: 1 / 1;
+  }
+  canvas#wheel {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 50%;
+    filter: drop-shadow(0 6px 18px rgba(0,0,0,.35));
+  }
+  @keyframes idle-spin {
+    from { transform: rotate(var(--idle-start, 0deg)); }
+    to   { transform: rotate(calc(var(--idle-start, 0deg) + 360deg)); }
+  }
+  canvas#wheel.idle { animation: idle-spin 26s linear infinite; }
+  .pointer {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 26px solid var(--gold);
+    transform: translateX(-50%);
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.4));
+    z-index: 2;
+  }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid var(--gold-border);
+    background: var(--gold);
+    color: #1a1500;
+    font-weight: 600;
+    padding: .5rem .9rem;
+  }
+  button:hover { background: #ffdb66; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary { padding: .75rem 1.5rem; font-size: 1.05rem; }
+  button.icon { padding: .3rem .55rem; font-size: .8rem; }
+  button.secondary {
+    background: var(--btn-secondary-bg); color: var(--text); border-color: var(--border-solid); font-weight: 500;
+  }
+  button.secondary:hover { background: var(--btn-secondary-bg-hover); }
+  button.outline {
+    background: transparent; color: var(--gold-text); border-color: var(--gold-border);
+  }
+  button.outline:hover { background: #ffd23f22; }
+  #themeToggleBtn {
+    position: fixed; top: .75rem; right: .75rem; z-index: 5;
+    width: 2.25rem; height: 2.25rem; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; line-height: 1;
+    background: transparent; border: 1px solid var(--border-solid); border-radius: 50%;
+    color: var(--text); opacity: .7;
+  }
+  #themeToggleBtn:hover { opacity: 1; background: var(--well); }
+  .session-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .6rem;
+    font-size: .85rem;
+    color: var(--muted);
+  }
+  .session-bar code {
+    background: var(--well);
+    border: 1px solid var(--border-solid);
+    padding: .15rem .45rem;
+    border-radius: 6px;
+    color: var(--text);
+    letter-spacing: .05em;
+  }
+  .spin-error {
+    color: #ff5c6c;
+    font-size: .85rem;
+    min-height: 1.1em;
+  }
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+
+  /* Confetti */
+  #confetti {
+    position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 30;
+  }
+  .confetti-piece {
+    position: absolute; top: -2rem;
+    animation-name: confetti-fall;
+    animation-timing-function: ease-in;
+    animation-fill-mode: forwards;
+  }
+  @keyframes confetti-fall {
+    to { transform: translateY(110vh) rotate(360deg); opacity: .3; }
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0; width: 100%; height: 100vh; height: 100dvh;
+    background: rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem; z-index: 10;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--border-solid);
+    border-radius: 14px;
+    padding: 2rem;
+    width: min(100%, calc(100vw - 2rem), 420px);
+    max-height: 90vh;
+    overflow-y: auto;
+    text-align: center;
+  }
+  .modal-result { font-size: 2rem; font-weight: 700; margin: 0 0 .5rem; word-break: break-word; }
+  .modal-meta { color: var(--muted); font-size: .8rem; margin-bottom: 1.25rem; }
+  .modal-actions { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; margin-top: 1rem; }
+  .modal-link {
+    display: inline-block;
+    text-decoration: none;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: .5rem 1rem;
+  }
+  .modal-link[hidden] { display: none; }
+  .modal-link-yellow { background: var(--gold); color: #1a1500; border: 1px solid var(--gold-border); }
+  .modal-link-yellow:hover { background: #ffdb66; }
+  .modal-link-blue { background: #66b3ff; color: #06264a; border: 1px solid #3d8fe0; }
+  .modal-link-blue:hover { background: #8ac2ff; }
+
+  @media (max-width: 400px) {
+    .layout { padding: 1rem; gap: .75rem; }
+    h1#raffleTitle { font-size: 1.2rem; }
+    .modal { padding: 1.5rem; }
+    .modal-result { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+<button id="themeToggleBtn" type="button" aria-label="Switch to dark mode"></button>
+<div class="layout">
+
+  <h1 id="raffleTitle">Loading…</h1>
+
+  <div class="session-bar">
+    Session: <code id="sessionIdLabel"></code>
+    <button id="copySessionBtn" class="icon secondary" type="button">Copy</button>
+    <button id="newSessionBtn" class="icon secondary" type="button" hidden>New session</button>
+  </div>
+
+  <div class="wheel-wrap">
+    <div class="pointer" aria-hidden="true"></div>
+    <canvas id="wheel" width="600" height="600"></canvas>
+  </div>
+
+  <button id="spinBtn" class="primary" disabled>Spin</button>
+  <p id="spinError" class="spin-error" role="alert"></p>
+
+  <div id="liveRegion" class="visually-hidden" aria-live="polite" role="status"></div>
+</div>
+
+<div id="confetti" aria-hidden="true"></div>
+
+<div id="modalBackdrop" class="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalResult">
+    <p id="modalResult" class="modal-result"></p>
+    <p id="modalMeta" class="modal-meta"></p>
+    <div class="modal-actions">
+      <a id="modalLink1" class="modal-link modal-link-yellow" target="_blank" rel="noopener noreferrer" hidden></a>
+      <a id="modalLink2" class="modal-link modal-link-blue" target="_blank" rel="noopener noreferrer" hidden></a>
+    </div>
+    <div class="modal-actions">
+      <button id="spinAgainBtn" class="primary outline">Spin again</button>
+      <button id="closeModalBtn" class="secondary">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Theme toggle (light is default; dark is an explicit, saved choice) ----
+  (function () {
+    var btn = document.getElementById("themeToggleBtn");
+    function isDark() { return document.documentElement.getAttribute("data-theme") === "dark"; }
+    function syncLabel() {
+      btn.textContent = isDark() ? "☀️" : "🌙";
+      btn.setAttribute("aria-label", isDark() ? "Switch to light mode" : "Switch to dark mode");
+    }
+    syncLabel();
+    btn.addEventListener("click", function () {
+      var next = isDark() ? "light" : "dark";
+      if (next === "dark") document.documentElement.setAttribute("data-theme", "dark");
+      else document.documentElement.removeAttribute("data-theme");
+      try { localStorage.setItem("wheel_theme", next); } catch (e) {}
+      syncLabel();
+    });
+  })();
+
+  // ---- Session id --------------------------------------------------------
+  var SESSION_KEY = "wheel_sessionId";
+  var REMEMBER_KEY = "wheel_rememberedSession";
+  var REMEMBER_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+  var ID_CHARS = "abcdefghjkmnpqrstuvwxyz23456789"; // no 0/o/1/l/i, so it's easy to read aloud
+  // Auto-generated ids use a smaller no-ambiguous-chars alphabet (below); this regex
+  // is the broader validity check, since a ?sid= or manually-typed id can be anything
+  // alphanumeric (e.g. "user123").
+  var SESSION_ID_RE = /^[a-z0-9]{1,32}$/;
+
+  function randomIndex(max) {
+    var buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0] % max;
+  }
+
+  function makeSessionId() {
+    var len = 6 + randomIndex(3); // 6-8
+    var id = "";
+    for (var i = 0; i < len; i++) {
+      id += ID_CHARS[randomIndex(ID_CHARS.length)];
+    }
+    return id;
+  }
+
+  // Remembers the last-used id across browser sessions (localStorage, unlike the
+  // per-tab sessionStorage), so a returning visitor can be offered it within 7 days.
+  function readRememberedId() {
+    try {
+      var data = JSON.parse(localStorage.getItem(REMEMBER_KEY));
+      if (!data || !SESSION_ID_RE.test(data.id)) return null;
+      if (Date.now() - data.savedAt > REMEMBER_MAX_AGE_MS) return null;
+      return data.id;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function rememberId(id) {
+    try {
+      localStorage.setItem(REMEMBER_KEY, JSON.stringify({ id: id, savedAt: Date.now() }));
+    } catch (e) {}
+  }
+
+  var sessionId;
+
+  function setSessionId(id) {
+    sessionId = id;
+    sessionStorage.setItem(SESSION_KEY, id);
+    rememberId(id);
+    document.getElementById("sessionIdLabel").textContent = sessionId;
+  }
+
+  function newSession() {
+    setSessionId(makeSessionId());
+  }
+
+  // A ?sid=... in the URL sets the session explicitly (e.g. a link handed out
+  // for a specific viewer), taking priority over whatever the browser has stored.
+  function readSidFromUrl() {
+    try {
+      var sid = new URLSearchParams(window.location.search).get("sid");
+      if (sid) {
+        sid = sid.trim().toLowerCase();
+        if (SESSION_ID_RE.test(sid)) return sid;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // Init: a ?sid= in the URL wins; otherwise reuse this tab's session if it has
+  // one; otherwise, if a recent id is remembered from a previous visit, apply it
+  // directly (no confirmation needed) and show it in the "have an id?" field too.
+  (function initSession() {
+    var sidFromUrl = readSidFromUrl();
+    if (sidFromUrl) {
+      setSessionId(sidFromUrl);
+      return;
+    }
+
+    var tabId = sessionStorage.getItem(SESSION_KEY);
+    if (tabId && SESSION_ID_RE.test(tabId)) {
+      setSessionId(tabId);
+      return;
+    }
+
+    var remembered = readRememberedId();
+    if (remembered) {
+      setSessionId(remembered);
+    } else {
+      setSessionId(makeSessionId());
+    }
+  })();
+
+  document.getElementById("copySessionBtn").addEventListener("click", function () {
+    navigator.clipboard.writeText(sessionId);
+  });
+  document.getElementById("newSessionBtn").addEventListener("click", newSession);
+
+  // ---- Options (server-owned, admin-managed) ------------------------------
+  var options = [];
+
+  // ---- Wheel rendering (canvas) -------------------------------------------
+  var canvas = document.getElementById("wheel");
+  var ctx = canvas.getContext("2d");
+  var currentRotationDeg = 0;
+  var spinning = false;
+  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var WHEEL_COLORS = ["#2f6fed", "#ffd23f"];
+  function colorForIndex(i) {
+    return WHEEL_COLORS[i % WHEEL_COLORS.length];
+  }
+
+  function drawWheel() {
+    var size = canvas.width;
+    var cx = size / 2, cy = size / 2, r = size / 2 - 4;
+    var n = options.length;
+    ctx.clearRect(0, 0, size, size);
+
+    if (n === 0) return;
+
+    var anglePer = (2 * Math.PI) / n;
+    for (var i = 0; i < n; i++) {
+      var start = i * anglePer;
+      var end = start + anglePer;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, start, end);
+      ctx.closePath();
+      ctx.fillStyle = colorForIndex(i);
+      ctx.fill();
+
+      var segMid = start + anglePer / 2;
+      var normMid = ((segMid % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      var flip = normMid > Math.PI / 2 && normMid < 1.5 * Math.PI;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(flip ? segMid + Math.PI : segMid);
+      ctx.textAlign = flip ? "left" : "right";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#111";
+      ctx.font = "bold " + Math.max(14, size * 0.032) + "px system-ui, sans-serif";
+      ctx.fillText(truncate(options[i].value, 22), flip ? -(r - 14) : (r - 14), 0);
+      ctx.restore();
+    }
+  }
+
+  function truncate(s, max) {
+    return s.length > max ? s.slice(0, max - 1) + "…" : s;
+  }
+
+  function resizeCanvas() {
+    var wrap = canvas.parentElement;
+    var cssSize = wrap.clientWidth;
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = cssSize * dpr;
+    canvas.height = cssSize * dpr;
+    drawWheel();
+  }
+
+  window.addEventListener("resize", resizeCanvas);
+
+  function startIdleSpin() {
+    if (reducedMotion) return;
+    canvas.style.setProperty("--idle-start", (currentRotationDeg % 360) + "deg");
+    canvas.classList.add("idle");
+  }
+
+  function getRenderedRotationDeg() {
+    var t = getComputedStyle(canvas).transform;
+    if (t === "none") return 0;
+    var m = t.match(/^matrix\(([^,]+),([^,]+),/);
+    if (!m) return 0;
+    var a = parseFloat(m[1]), b = parseFloat(m[2]);
+    var deg = Math.atan2(b, a) * (180 / Math.PI);
+    return deg < 0 ? deg + 360 : deg;
+  }
+
+  // ---- Spin logic ------------------------------------------------------
+  var spinBtn = document.getElementById("spinBtn");
+  var liveRegion = document.getElementById("liveRegion");
+  var spinErrorEl = document.getElementById("spinError");
+
+  function setSpinning(value) {
+    spinning = value;
+    spinBtn.disabled = value || options.length < 2;
+  }
+
+  async function spin() {
+    if (spinning || options.length < 2) return;
+    setSpinning(true);
+    spinErrorEl.textContent = "";
+
+    var data;
+    try {
+      var res = await fetch("/api/spin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: sessionId })
+      });
+      data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        throw new Error(data.error || "Could not spin the wheel.");
+      }
+    } catch (err) {
+      spinErrorEl.textContent = err.message || "Connection error. Please try again.";
+      setSpinning(false);
+      return;
+    }
+
+    if (data.sessionId && data.sessionId !== sessionId) {
+      setSessionId(data.sessionId);
+    }
+
+    var winningIndex = options.findIndex(function (o) { return o.value === data.result; });
+    if (winningIndex === -1) winningIndex = 0;
+
+    animateTo(winningIndex, options.length, data);
+  }
+
+  function animateTo(winningIndex, n, record) {
+    // Freeze the idle animation exactly where it currently is, so the precise
+    // spin-to-result animation continues seamlessly from the visible position.
+    var measured = getRenderedRotationDeg();
+    canvas.classList.remove("idle");
+    canvas.style.transition = "none";
+    canvas.style.transform = "rotate(" + measured + "deg)";
+    canvas.offsetHeight; // force reflow
+    currentRotationDeg = measured;
+
+    var anglePerDeg = 360 / n;
+    // Lands at a random spot inside the winning segment, not dead-center every time
+    // (always stopping on the exact center reads as rigged). Stays clear of the
+    // segment's edges so it's still unambiguous which slice the pointer landed on.
+    var edgeMargin = anglePerDeg * 0.15;
+    var offset = (Math.random() * 2 - 1) * (anglePerDeg / 2 - edgeMargin);
+    var segCenterDeg = winningIndex * anglePerDeg + anglePerDeg / 2 + offset;
+
+    var normalizedCurrent = ((currentRotationDeg % 360) + 360) % 360;
+    var desiredMod = (((270 - segCenterDeg) % 360) + 360) % 360;
+    var delta = ((desiredMod - normalizedCurrent) % 360 + 360) % 360;
+    var extraSpins = 5 + Math.floor(Math.random() * 3); // 5-7 full turns
+    var target = currentRotationDeg + delta + extraSpins * 360;
+
+    var duration = reducedMotion ? 0.4 : (4 + Math.random() * 2); // 4-6s, shortened if reduced-motion
+
+    canvas.style.transition = "transform " + duration + "s cubic-bezier(0.15, 0.85, 0.3, 1)";
+    canvas.style.transform = "rotate(" + target + "deg)";
+    currentRotationDeg = target;
+
+    canvas.addEventListener("transitionend", function onEnd() {
+      canvas.removeEventListener("transitionend", onEnd);
+      setSpinning(false);
+      spawnConfetti();
+      openModal(record);
+      startIdleSpin();
+    }, { once: true });
+  }
+
+  spinBtn.addEventListener("click", spin);
+
+  // ---- Confetti (sun emoji) -----------------------------------------------
+  function spawnConfetti() {
+    if (reducedMotion) return;
+    var container = document.getElementById("confetti");
+    // Measured pixel width, not vw/%: overflow:hidden on a position:fixed container
+    // isn't reliably enough to stop percent/vw-positioned children from still
+    // contributing to document.scrollWidth in every browser. Clamping the left
+    // offset in real pixels (container width minus the piece's own width) makes
+    // it mathematically impossible for a piece to extend past the edge at all.
+    var containerWidth = container.clientWidth;
+    var count = 40;
+    for (var i = 0; i < count; i++) {
+      var el = document.createElement("span");
+      el.className = "confetti-piece";
+      el.textContent = "☀️";
+      var size = 14 + Math.random() * 16;
+      var maxLeft = Math.max(0, containerWidth - size);
+      el.style.left = (Math.random() * maxLeft) + "px";
+      el.style.fontSize = size + "px";
+      el.style.animationDuration = (2 + Math.random() * 1.5) + "s";
+      el.style.animationDelay = (Math.random() * 0.3) + "s";
+      el.addEventListener("animationend", function () { this.remove(); });
+      container.appendChild(el);
+    }
+  }
+
+  // ---- Modal -------------------------------------------------------------
+  var modalBackdrop = document.getElementById("modalBackdrop");
+  var modalResult = document.getElementById("modalResult");
+  var modalMeta = document.getElementById("modalMeta");
+  var modalLink1 = document.getElementById("modalLink1");
+  var modalLink2 = document.getElementById("modalLink2");
+
+  function setModalLink(el, url, label) {
+    if (url) {
+      el.href = url;
+      el.textContent = label || url;
+      el.hidden = false;
+    } else {
+      el.hidden = true;
+    }
+  }
+
+  function openModal(record) {
+    modalResult.textContent = record.result;
+    modalMeta.textContent = "Session " + record.sessionId + " · Spin #" + record.spinNumber;
+    setModalLink(modalLink1, record.customUrl, record.customLabel);
+    setModalLink(modalLink2, record.customUrl2, record.customLabel2);
+    modalBackdrop.hidden = false;
+    liveRegion.textContent = "Result: " + record.result;
+    // Wait for the modal's own layout to settle before moving focus into it,
+    // so focus() can't force an early reflow mid-transition (that's what caused
+    // the card to briefly render oversized/off-edge before snapping to size).
+    requestAnimationFrame(function () {
+      document.getElementById("closeModalBtn").focus({ preventScroll: true });
+    });
+  }
+
+  function closeModal() {
+    modalBackdrop.hidden = true;
+  }
+
+  document.getElementById("closeModalBtn").addEventListener("click", closeModal);
+  document.getElementById("spinAgainBtn").addEventListener("click", function () {
+    closeModal();
+    spin();
+  });
+
+  // ---- Init -------------------------------------------------------------
+  fetch("/api/config")
+    .then(function (res) { return res.json(); })
+    .then(function (config) {
+      document.getElementById("raffleTitle").textContent = config.title;
+      options = config.options || [];
+      resizeCanvas();
+      setSpinning(false);
+      startIdleSpin();
+    })
+    .catch(function () {
+      document.getElementById("raffleTitle").textContent = "Raffle Wheel";
+      spinErrorEl.textContent = "Could not load the raffle configuration.";
+    });
+})();
+</script>
+</body>
+</html>

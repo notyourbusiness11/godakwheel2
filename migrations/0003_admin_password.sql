@@ -1,0 +1,1 @@
+ALTER TABLE config ADD COLUMN admin_password TEXT NOT NULL DEFAULT '12345';

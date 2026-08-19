@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(nohup npm run dev)",
+      "Bash(disown)",
+      "Read(//private/tmp/**)",
+      "Bash(curl -s -c cookies.txt -X POST http://localhost:8788/godak/login -d \"password=12345\" -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s -b cookies.txt -X POST http://localhost:8788/godak/config --data-urlencode 'title=Test Raffle' --data-urlencode 'optionsJson=[{\"value\":\"$10\",\"customUrl\":\"https://throne.com/godak/10\",\"customLabel\":\"Send 10 on throne\"},{\"value\":\"$20\",\"customUrl\":\"https://throne.com/godak/20\",\"customLabel\":\"Send 20 on throne\"},{\"value\":\"spin again\",\"customUrl\":\"https://throne.com/godak\",\"customLabel\":\"Send anyway on throne\",\"customUrl2\":\"https://youpay.com/godak\",\"customLabel2\":\"Send anyway on youpay\"}]' -o /dev/null -w '%{http_code}\\\\n')",
+      "Bash(curl -s http://localhost:8788/api/config)",
+      "Bash(curl -s -X POST http://localhost:8788/api/spin -H \"Content-Type: application/json\" -d '{\"sessionId\":\"curltest1\"}')",
+      "Bash(pkill -f \"wrangler dev\")",
+      "Bash(curl -s -c cookies2.txt -X POST http://localhost:8788/godak/login -d \"password=12345\" -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s -b cookies2.txt -X POST http://localhost:8788/godak/config --data-urlencode 'title=Test Raffle' --data-urlencode 'optionsJson=[{\"value\":\"$10\",\"customUrl\":\"https://throne.com/godak/10\",\"customLabel\":\"Send 10 on throne\"},{\"value\":\"$20\",\"customUrl\":\"https://throne.com/godak/20\",\"customLabel\":\"Send 20 on throne\"},{\"value\":\"spin again\",\"customUrl\":\"https://throne.com/godak\",\"customLabel\":\"Send anyway on throne\",\"customUrl2\":\"https://youpay.com/godak\",\"customLabel2\":\"Send anyway on youpay\"}]' -o /dev/null -w '%{http_code}\\\\n')",
+      "Bash(curl -s -c cookies2.txt -X POST http://localhost:8787/godak/login -d \"password=12345\" -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s -b cookies2.txt -X POST http://localhost:8787/godak/config --data-urlencode 'title=Test Raffle' --data-urlencode 'optionsJson=[{\"value\":\"$10\",\"customUrl\":\"https://throne.com/godak/10\",\"customLabel\":\"Send 10 on throne\"},{\"value\":\"$20\",\"customUrl\":\"https://throne.com/godak/20\",\"customLabel\":\"Send 20 on throne\"},{\"value\":\"spin again\",\"customUrl\":\"https://throne.com/godak\",\"customLabel\":\"Send anyway on throne\",\"customUrl2\":\"https://youpay.com/godak\",\"customLabel2\":\"Send anyway on youpay\"}]' -o /dev/null -w '%{http_code}\\\\n')",
+      "Bash(curl -s http://localhost:8788/)",
+      "Bash(node -e ' *)",
+      "Bash(curl -s http://localhost:8787/)",
+      "Bash(curl -s -o /dev/null -w \"godak: %{http_code}\\\\n\" http://localhost:8787/godak)",
+      "Bash(curl -s -o /dev/null -w \"api/config: %{http_code}\\\\n\" http://localhost:8787/api/config)",
+      "Bash(curl -s -o /dev/null http://localhost:8787/)",
+      "Bash(curl -s http://localhost:8787/ -o /tmp/out.html -w \"http:%{http_code}\\\\n\")",
+      "Bash(curl *)",
+      "Bash(npx wrangler *)",
+      "Bash(sqlite3 :memory: \"CREATE TABLE t\\(id INTEGER PRIMARY KEY, x TEXT\\); INSERT INTO t \\(id,x\\) VALUES \\(1,'hi'\\); ALTER TABLE t ADD COLUMN default_theme TEXT NOT NULL DEFAULT 'light'; SELECT * FROM t;\")"
+    ]
+  }
+}

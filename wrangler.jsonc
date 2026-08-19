@@ -1,0 +1,16 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "godakwheel2",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-01-01",
+	"assets": {
+		"directory": "./public"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "godakwheel-database2",
+			"database_id": "1fe9a557-1251-4839-a2e5-c34292213992"
+		}
+	]
+}
